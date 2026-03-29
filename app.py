@@ -179,7 +179,7 @@ else:
                 "Change status:",
                 STATUS_OPTIONS,
                 index=STATUS_OPTIONS.index(current_status),
-                key=f"status_{i}"
+                key=f"status_{selected_client}_{i}"
             )
             if new_status != current_status:
                 original_index = df[
