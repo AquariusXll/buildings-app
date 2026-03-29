@@ -104,7 +104,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Инициализация ---
-st.set_page_config(page_title="Buildings Tracker", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="Buildings JSON Tracker", page_icon="🏢", layout="wide")
 
 if "selected_client" not in st.session_state:
     st.session_state["selected_client"] = None
