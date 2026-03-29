@@ -112,6 +112,21 @@ def export_excel(df):
 
 # --- Стили ---
 st.markdown("""
+div[data-testid="stButton"] > button {
+        text-align: left !important;
+        padding: 12px 18px !important;
+        border-radius: 10px !important;
+        border: 1px solid #333 !important;
+        background-color: #1e1e2e !important;
+        color: white !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        margin-bottom: 4px !important;
+    }
+    div[data-testid="stButton"] > button:hover {
+        background-color: #2a2a3e !important;
+        border-color: #555 !important;
+    }
     <style>
     .building-card {
         padding: 12px 16px;
@@ -268,28 +283,16 @@ if st.session_state["selected_client"] is None:
             </div>
         """, unsafe_allow_html=True)
 
-        if st.button("", key=f"open_{client}", help=f"Open {client}", use_container_width=True):
+if st.button(
+            f"🏢  {client}   {icon} {status_label}  ·  {done_count}/{total} facilities",
+            key=f"open_{client}",
+            use_container_width=True
+        ):
             st.session_state["selected_client"] = client
             st.session_state["confirm_delete"] = False
             st.session_state["editing_client"] = False
             st.session_state["editing_building"] = None
             st.rerun()
-
-        st.markdown("""
-            <style>
-            div[data-testid="stButton"] button {
-                margin-top: -62px;
-                height: 56px;
-                background: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
-            }
-            div[data-testid="stButton"] button:hover {
-                background: rgba(255,255,255,0.05) !important;
-                border-radius: 10px !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
 
     st.divider()
 
