@@ -72,13 +72,14 @@ def delete_client(sheet, client_name):
 
 def get_client_status(client_buildings_df):
     statuses = client_buildings_df["JSON Status:"].apply(lambda x: str(x).strip()).tolist()
-    if all(s == "Done" for s in statuses):
-        return "Done"
-    elif any(s == "Done" for s in statuses):
-        done_count = sum(1 for s in statuses if s == "Done")
-        return f"{done_count}/{len(statuses)} Done"
+    done_count = sum(1 for s in statuses if s == "Done")
+    total = len(statuses)
+    if done_count == total:
+        return "Done", done_count, total
+    elif done_count == 0:
+        return "Not started", done_count, total
     else:
-        return "Not started"
+        return "In progress", done_count, total
 
 # --- Стили ---
 st.markdown("""
@@ -87,20 +88,15 @@ st.markdown("""
         padding: 14px 18px;
         border-radius: 10px;
         margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        cursor: pointer;
         background-color: #1e1e2e;
         border: 1px solid #333;
-        transition: background 0.2s;
     }
     .client-name {
         font-size: 16px;
         font-weight: 600;
         color: white;
     }
-    .client-badge {
+    .badge {
         padding: 4px 14px;
         border-radius: 20px;
         font-size: 13px;
@@ -110,84 +106,79 @@ st.markdown("""
         padding: 12px 16px;
         border-radius: 10px;
         margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
     }
     .building-name {
         font-size: 16px;
         font-weight: 600;
         color: white;
     }
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
+    .back-hint {
+        color: #888;
         font-size: 13px;
-        font-weight: 600;
+        margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Инициализация ---
-st.set_page_config(page_title="Buildings Tracker", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="Buildings JSON Tracker", page_icon="🏢", layout="wide")
 
 if "selected_client" not in st.session_state:
     st.session_state["selected_client"] = None
+if "confirm_delete" not in st.session_state:
+    st.session_state["confirm_delete"] = False
 
 df, sheet = load_data()
 clients = sorted(df["Client:"].unique().tolist())
 
-# --- Навигация (вкладки) ---
-tab1, tab2 = st.tabs(["📋 All Clients", "🏢 Client Details"])
+# =====================
+# ЭКРАН 1 — Все клиенты
+# =====================
+if st.session_state["selected_client"] is None:
 
-# =====================
-# ВКЛАДКА 1 — Все клиенты
-# =====================
-with tab1:
     st.title("🏢 Buildings Tracker")
     st.markdown(f"**Total clients: {len(clients)}**")
     st.divider()
 
     for client in clients:
         client_df = df[df["Client:"] == client]
-        client_status = get_client_status(client_df)
-        total = len(client_df)
-        done = sum(1 for s in client_df["JSON Status:"] if str(s).strip() == "Done")
+        status_label, done_count, total = get_client_status(client_df)
 
-        if client_status == "Done":
-            badge_color = "#1a7a1a"
-            badge_text_color = "#00ff00"
-            badge_icon = "🟢"
-        elif client_status == "Not started":
-            badge_color = "#7a1a1a"
-            badge_text_color = "#ff4444"
-            badge_icon = "🔴"
+        if status_label == "Done":
+            badge_bg = "#1a7a1a"
+            badge_color = "#00ff00"
+            icon = "🟢"
+        elif status_label == "Not started":
+            badge_bg = "#7a1a1a"
+            badge_color = "#ff4444"
+            icon = "🔴"
         else:
-            badge_color = "#7a6a1a"
-            badge_text_color = "#ffcc00"
-            badge_icon = "🟡"
+            badge_bg = "#7a6a1a"
+            badge_color = "#ffcc00"
+            icon = "🟡"
 
-        col1, col2 = st.columns([4, 1])
+        col1, col2 = st.columns([5, 1])
         with col1:
             st.markdown(f"""
                 <div class="client-row">
                     <span class="client-name">🏢 {client}</span>
-                    <span class="client-badge" style="background-color:{badge_color}; color:{badge_text_color};">
-                        {badge_icon} {client_status} &nbsp;|&nbsp; {done}/{total} facilities
+                    &nbsp;&nbsp;
+                    <span class="badge" style="background-color:{badge_bg}; color:{badge_color};">
+                        {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
                     </span>
                 </div>
             """, unsafe_allow_html=True)
         with col2:
             if st.button("Open →", key=f"open_{client}"):
                 st.session_state["selected_client"] = client
+                st.session_state["confirm_delete"] = False
                 st.rerun()
 
     st.divider()
 
-    # --- Добавить клиента ---
     with st.expander("➕ Add new client"):
-        new_client_name = st.text_input("Client name:", key="new_client_name")
-        first_building = st.text_input("First facility:", key="first_building")
+        new_client_name = st.text_input("Client name:")
+        first_building = st.text_input("First facility:")
         if st.button("Create", type="primary"):
             if new_client_name.strip() == "" or first_building.strip() == "":
                 st.error("Please fill in both fields!")
@@ -200,96 +191,112 @@ with tab1:
                 st.rerun()
 
 # =====================
-# ВКЛАДКА 2 — Детали клиента
+# ЭКРАН 2 — Детали клиента
 # =====================
-with tab2:
-    if st.session_state["selected_client"] is None:
-        st.info("👈 Select a client from the 'All Clients' tab")
+else:
+    selected_client = st.session_state["selected_client"]
+    client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
+
+    # --- Стрелка назад ---
+    if st.button("← Back to all clients"):
+        st.session_state["selected_client"] = None
+        st.session_state["confirm_delete"] = False
+        st.rerun()
+
+    st.markdown(f"## 🏢 {selected_client}")
+    
+    status_label, done_count, total = get_client_status(client_df)
+    if status_label == "Done":
+        badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
+    elif status_label == "Not started":
+        badge_bg = "#7a1a1a"; badge_color = "#ff4444"; icon = "🔴"
     else:
-        selected_client = st.session_state["selected_client"]
-        client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
+        badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
-        col_title, col_delete = st.columns([4, 1])
-        with col_title:
-            st.title(f"🏢 {selected_client}")
-            st.markdown(f"Total facilities: **{len(client_df)}**")
-        with col_delete:
+    st.markdown(f"""
+        <span class="badge" style="background-color:{badge_bg}; color:{badge_color}; padding: 6px 16px; border-radius: 20px;">
+            {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
+        </span>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- Кнопка удалить клиента ---
+    if st.button("🗑️ Delete this client", type="primary"):
+        st.session_state["confirm_delete"] = True
+
+    if st.session_state["confirm_delete"]:
+        st.warning(f"⚠️ Delete **{selected_client}** and ALL their facilities?")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Yes, delete"):
+                delete_client(sheet, selected_client)
+                st.session_state["selected_client"] = None
+                st.session_state["confirm_delete"] = False
+                st.cache_resource.clear()
+                st.rerun()
+        with c2:
+            if st.button("Cancel"):
+                st.session_state["confirm_delete"] = False
+                st.rerun()
+
+    st.divider()
+
+    # --- Здания ---
+    for i, row in client_df.iterrows():
+        raw_status = str(row["JSON Status:"]).strip()
+        current_status = raw_status if raw_status in STATUS_OPTIONS else "Unknown status"
+        bg_color = STATUS_COLORS.get(current_status, "#3a3a3a")
+        text_color = STATUS_TEXT_COLORS.get(current_status, "#aaaaaa")
+        icon = STATUS_ICONS.get(current_status, "⚪")
+
+        col1, col2, col3 = st.columns([3, 2, 1])
+
+        with col1:
+            st.markdown(f"""
+                <div class="building-card" style="background-color: {bg_color};">
+                    <span class="building-name">{row['Building:']}</span>
+                    &nbsp;&nbsp;
+                    <span class="badge" style="color: {text_color};">
+                        {icon} {current_status}
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            new_status = st.selectbox(
+                "Change status:",
+                STATUS_OPTIONS,
+                index=STATUS_OPTIONS.index(current_status),
+                key=f"status_{selected_client}_{i}"
+            )
+            if new_status != current_status:
+                original_index = df[
+                    (df["Client:"] == selected_client) &
+                    (df["Building:"] == row["Building:"])
+                ].index[0]
+                update_status(sheet, original_index, new_status)
+                st.success("✅ Saved!")
+                st.cache_resource.clear()
+                st.rerun()
+
+        with col3:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🗑️ Delete client", type="primary"):
-                st.session_state["confirm_delete"] = True
+            if st.button("🗑️", key=f"del_{selected_client}_{i}", help="Delete facility"):
+                delete_building(sheet, selected_client, row["Building:"])
+                st.success("✅ Deleted!")
+                st.cache_resource.clear()
+                st.rerun()
 
-        if st.session_state.get("confirm_delete"):
-            st.warning(f"⚠️ Delete **{selected_client}** and ALL facilities?")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Yes, delete"):
-                    delete_client(sheet, selected_client)
-                    st.session_state["selected_client"] = None
-                    st.session_state["confirm_delete"] = False
-                    st.cache_resource.clear()
-                    st.rerun()
-            with c2:
-                if st.button("Cancel"):
-                    st.session_state["confirm_delete"] = False
-                    st.rerun()
+    st.divider()
 
-        st.divider()
-
-        # --- Здания ---
-        for i, row in client_df.iterrows():
-            raw_status = str(row["JSON Status:"]).strip()
-            current_status = raw_status if raw_status in STATUS_OPTIONS else "Unknown status"
-            bg_color = STATUS_COLORS.get(current_status, "#3a3a3a")
-            text_color = STATUS_TEXT_COLORS.get(current_status, "#aaaaaa")
-            icon = STATUS_ICONS.get(current_status, "⚪")
-
-            col1, col2, col3 = st.columns([3, 2, 1])
-
-            with col1:
-                st.markdown(f"""
-                    <div class="building-card" style="background-color: {bg_color};">
-                        <span class="building-name">{row['Building:']}</span>
-                        <span class="status-badge" style="color: {text_color};">
-                            {icon} {current_status}
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with col2:
-                new_status = st.selectbox(
-                    "Change status:",
-                    STATUS_OPTIONS,
-                    index=STATUS_OPTIONS.index(current_status),
-                    key=f"status_{selected_client}_{i}"
-                )
-                if new_status != current_status:
-                    original_index = df[
-                        (df["Client:"] == selected_client) &
-                        (df["Building:"] == row["Building:"])
-                    ].index[0]
-                    update_status(sheet, original_index, new_status)
-                    st.success("✅ Saved!")
-                    st.cache_resource.clear()
-                    st.rerun()
-
-            with col3:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🗑️", key=f"del_{selected_client}_{i}", help="Delete facility"):
-                    delete_building(sheet, selected_client, row["Building:"])
-                    st.success("✅ Deleted!")
-                    st.cache_resource.clear()
-                    st.rerun()
-
-        st.divider()
-
-        # --- Добавить здание ---
-        with st.expander("➕ Add new facility"):
-            new_building = st.text_input("Facility name:", key="new_building_input")
-            if st.button("Add facility", type="primary"):
-                if new_building.strip() == "":
-                    st.error("Enter a facility name!")
-                else:
-                    add_row(sheet, selected_client, new_building.strip())
-                    st.success(f"✅ '{new_building}' added!")
-                    st.cache_resource.clear()
-                    st.rerun()
+    with st.expander("➕ Add new facility"):
+        new_building = st.text_input("Facility name:", key="new_building_input")
+        if st.button("Add facility", type="primary"):
+            if new_building.strip() == "":
+                st.error("Enter a facility name!")
+            else:
+                add_row(sheet, selected_client, new_building.strip())
+                st.success(f"✅ '{new_building}' added!")
+                st.cache_resource.clear()
+                st.rerun()
