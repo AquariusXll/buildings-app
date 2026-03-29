@@ -119,7 +119,7 @@ clients = sorted(df["Client:"].unique().tolist())
 # =====================
 if st.session_state["selected_client"] is None:
 
-    st.title("🏢 Buildings Tracker")
+    st.title("🏢 Buildings JSON Tracker")
     st.markdown(f"**Total clients: {len(clients)}**")
     st.divider()
 
