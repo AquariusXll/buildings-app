@@ -2,7 +2,6 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-import time
 
 # --- Настройка ---
 SPREADSHEET_ID = "1pBjVOwQS8_1CVsfH3zTRg0MAHjb1STNCbWhKbFg5i60"
@@ -48,15 +47,12 @@ def load_data():
     return pd.DataFrame(data), sheet
 
 def update_status(sheet, row_index, new_status):
-    time.sleep(0.5)
     sheet.update_cell(row_index + 2, 3, new_status)
 
 def add_row(sheet, client_name, building_name):
-    time.sleep(0.5)
     sheet.append_row([client_name, building_name, "Unknown status"])
 
-def delete_building(sheet, client_name, building_name):
-    time.sleep(0.5)
+def delete_building(sheet, df, client_name, building_name):
     all_values = sheet.get_all_values()
     for i, row in enumerate(all_values[1:], start=2):
         if row[0] == client_name and row[1] == building_name:
@@ -64,7 +60,6 @@ def delete_building(sheet, client_name, building_name):
             break
 
 def delete_client(sheet, client_name):
-    time.sleep(0.5)
     all_values = sheet.get_all_values()
     rows_to_delete = []
     for i, row in enumerate(all_values[1:], start=2):
@@ -72,7 +67,6 @@ def delete_client(sheet, client_name):
             rows_to_delete.append(i)
     for row_num in reversed(rows_to_delete):
         sheet.delete_rows(row_num)
-        time.sleep(0.3)
 
 # --- Стили ---
 st.markdown("""
@@ -132,6 +126,7 @@ if selected_client == "➕ Add new client...":
             st.rerun()
 
 else:
+    # --- Список зданий клиента ---
     client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
 
     col_title, col_delete_client = st.columns([4, 1])
@@ -162,8 +157,7 @@ else:
 
     # --- Здания ---
     for i, row in client_df.iterrows():
-        raw_status = str(row["JSON Status:"]).strip()
-        current_status = raw_status if raw_status in STATUS_OPTIONS else "Unknown status"
+        current_status = row["JSON Status:"] if row["JSON Status:"] in STATUS_OPTIONS else "Unknown status"
         bg_color = STATUS_COLORS.get(current_status, "#3a3a3a")
         text_color = STATUS_TEXT_COLORS.get(current_status, "#aaaaaa")
         icon = STATUS_ICONS.get(current_status, "⚪")
@@ -200,8 +194,8 @@ else:
         with col3:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🗑️", key=f"del_{i}", help="Delete this facility"):
-                delete_building(sheet, selected_client, row["Building:"])
-                st.success("✅ Deleted!")
+                delete_building(sheet, df, selected_client, row["Building:"])
+                st.success(f"✅ Deleted!")
                 st.cache_resource.clear()
                 st.rerun()
 
