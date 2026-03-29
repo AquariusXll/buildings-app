@@ -112,21 +112,6 @@ def export_excel(df):
 
 # --- Стили ---
 st.markdown("""
-div[data-testid="stButton"] > button {
-        text-align: left !important;
-        padding: 12px 18px !important;
-        border-radius: 10px !important;
-        border: 1px solid #333 !important;
-        background-color: #1e1e2e !important;
-        color: white !important;
-        font-size: 15px !important;
-        font-weight: 500 !important;
-        margin-bottom: 4px !important;
-    }
-    div[data-testid="stButton"] > button:hover {
-        background-color: #2a2a3e !important;
-        border-color: #555 !important;
-    }
     <style>
     .building-card {
         padding: 12px 16px;
@@ -146,6 +131,21 @@ div[data-testid="stButton"] > button {
     }
     div[data-testid="stButton"] button {
         transition: background 0.2s;
+    }
+    div[data-testid="stButton"] > button {
+        text-align: left !important;
+        padding: 12px 18px !important;
+        border-radius: 10px !important;
+        border: 1px solid #333 !important;
+        background-color: #1e1e2e !important;
+        color: white !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        margin-bottom: 4px !important;
+    }
+    div[data-testid="stButton"] > button:hover {
+        background-color: #2a2a3e !important;
+        border-color: #555 !important;
     }
     </style>
 """, unsafe_allow_html=True)
