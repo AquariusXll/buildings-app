@@ -128,20 +128,32 @@ if st.session_state["selected_client"] is None:
         status_label, done_count, total = get_client_status(client_df)
 
         if status_label == "Done":
-            icon = "🟢"
+            badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
         elif status_label == "Not started":
-            icon = "🔴"
+            badge_bg = "#7a1a1a"; badge_color = "#ff4444"; icon = "🔴"
         else:
-            icon = "🟡"
+            badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
-        if st.button(
-            f"🏢  {client}     {icon} {status_label}  ·  {done_count}/{total} facilities",
-            key=f"open_{client}",
-            use_container_width=True
-        ):
-            st.session_state["selected_client"] = client
-            st.session_state["confirm_delete"] = False
-            st.rerun()
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            st.markdown(f"""
+                <div class="client-row" style="padding:14px 18px; border-radius:10px; 
+                margin-bottom:8px; background-color:#1e1e2e; border:1px solid #333;">
+                    <span style="font-size:16px; font-weight:600; color:white;">
+                        🏢 {client}
+                    </span>
+                    &nbsp;&nbsp;
+                    <span style="padding:4px 14px; border-radius:20px; font-size:13px; 
+                    font-weight:600; background-color:{badge_bg}; color:{badge_color};">
+                        {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            if st.button("Open →", key=f"open_{client}"):
+                st.session_state["selected_client"] = client
+                st.session_state["confirm_delete"] = False
+                st.rerun()
 
     st.divider()
 
