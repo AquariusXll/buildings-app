@@ -178,7 +178,7 @@ else:
             new_status = st.selectbox(
                 "Change status:",
                 STATUS_OPTIONS,
-                index=STATUS_OPTIONS.index(current_status),
+                index=STATUS_OPTIONS.index(current_status) if current_status in STATUS_OPTIONS else 0,
                 key=f"status_{i}"
             )
             if new_status != current_status:
