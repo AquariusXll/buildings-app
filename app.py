@@ -84,24 +84,6 @@ def get_client_status(client_buildings_df):
 # --- Стили ---
 st.markdown("""
     <style>
-    .client-row {
-        padding: 14px 18px;
-        border-radius: 10px;
-        margin-bottom: 8px;
-        background-color: #1e1e2e;
-        border: 1px solid #333;
-    }
-    .client-name {
-        font-size: 16px;
-        font-weight: 600;
-        color: white;
-    }
-    .badge {
-        padding: 4px 14px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 600;
-    }
     .building-card {
         padding: 12px 16px;
         border-radius: 10px;
@@ -112,16 +94,17 @@ st.markdown("""
         font-weight: 600;
         color: white;
     }
-    .back-hint {
-        color: #888;
+    .badge {
+        padding: 4px 14px;
+        border-radius: 20px;
         font-size: 13px;
-        margin-bottom: 20px;
+        font-weight: 600;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Инициализация ---
-st.set_page_config(page_title="Buildings JSON Tracker", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="Buildings Tracker", page_icon="🏢", layout="wide")
 
 if "selected_client" not in st.session_state:
     st.session_state["selected_client"] = None
@@ -145,34 +128,20 @@ if st.session_state["selected_client"] is None:
         status_label, done_count, total = get_client_status(client_df)
 
         if status_label == "Done":
-            badge_bg = "#1a7a1a"
-            badge_color = "#00ff00"
             icon = "🟢"
         elif status_label == "Not started":
-            badge_bg = "#7a1a1a"
-            badge_color = "#ff4444"
             icon = "🔴"
         else:
-            badge_bg = "#7a6a1a"
-            badge_color = "#ffcc00"
             icon = "🟡"
 
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            st.markdown(f"""
-                <div class="client-row">
-                    <span class="client-name">🏢 {client}</span>
-                    &nbsp;&nbsp;
-                    <span class="badge" style="background-color:{badge_bg}; color:{badge_color};">
-                        {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            if st.button("Open →", key=f"open_{client}"):
-                st.session_state["selected_client"] = client
-                st.session_state["confirm_delete"] = False
-                st.rerun()
+        if st.button(
+            f"🏢  {client}     {icon} {status_label}  ·  {done_count}/{total} facilities",
+            key=f"open_{client}",
+            use_container_width=True
+        ):
+            st.session_state["selected_client"] = client
+            st.session_state["confirm_delete"] = False
+            st.rerun()
 
     st.divider()
 
@@ -197,14 +166,13 @@ else:
     selected_client = st.session_state["selected_client"]
     client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
 
-    # --- Стрелка назад ---
+    # --- Назад ---
     if st.button("← Back to all clients"):
         st.session_state["selected_client"] = None
         st.session_state["confirm_delete"] = False
         st.rerun()
 
-    st.markdown(f"## 🏢 {selected_client}")
-    
+    # --- Заголовок ---
     status_label, done_count, total = get_client_status(client_df)
     if status_label == "Done":
         badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
@@ -213,15 +181,16 @@ else:
     else:
         badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
+    st.markdown(f"## 🏢 {selected_client}")
     st.markdown(f"""
-        <span class="badge" style="background-color:{badge_bg}; color:{badge_color}; padding: 6px 16px; border-radius: 20px;">
+        <span class="badge" style="background-color:{badge_bg}; color:{badge_color};">
             {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
         </span>
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- Кнопка удалить клиента ---
+    # --- Удалить клиента ---
     if st.button("🗑️ Delete this client", type="primary"):
         st.session_state["confirm_delete"] = True
 
@@ -290,6 +259,7 @@ else:
 
     st.divider()
 
+    # --- Добавить здание ---
     with st.expander("➕ Add new facility"):
         new_building = st.text_input("Facility name:", key="new_building_input")
         if st.button("Add facility", type="primary"):
