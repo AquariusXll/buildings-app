@@ -53,6 +53,25 @@ def load_data():
 def update_status(sheet, row_index, new_status):
     sheet.update_cell(row_index + 2, 3, new_status)
 
+def add_building(sheet, client_name, building_name):
+    sheet.append_row([client_name, building_name, "Unknown status"])
+
+def delete_building(sheet, df, client_name, building_name):
+    cell = sheet.find(building_name)
+    if cell:
+        row_data = sheet.row_values(cell.row)
+        if row_data[0] == client_name:
+            sheet.delete_rows(cell.row)
+
+def delete_client(sheet, df, client_name):
+    all_values = sheet.get_all_values()
+    rows_to_delete = []
+    for i, row in enumerate(all_values[1:], start=2):
+        if row[0] == client_name:
+            rows_to_delete.append(i)
+    for row_num in reversed(rows_to_delete):
+        sheet.delete_rows(row_num)
+
 # --- Стили ---
 st.markdown("""
     <style>
@@ -84,12 +103,72 @@ st.set_page_config(page_title="Buildings Tracker", page_icon="🏢", layout="wid
 st.title("🏢 Buildings Tracker")
 
 df, sheet = load_data()
-
-# Выбор клиента
 clients = sorted(df["Client:"].unique().tolist())
-selected_client = st.selectbox("Select client:", clients)
 
-# Фильтр по клиенту
+# --- Боковая панель с управлением ---
+with st.sidebar:
+    st.header("⚙️ Manage")
+
+    # Добавить клиента
+    st.subheader("➕ Add Client")
+    new_client = st.text_input("Client name:", key="new_client")
+    if st.button("Add Client"):
+        if new_client.strip() == "":
+            st.error("Enter a client name!")
+        elif new_client.strip() in clients:
+            st.error("This client already exists!")
+        else:
+            add_building(sheet, new_client.strip(), "First building")
+            st.success(f"✅ Client '{new_client}' added!")
+            st.cache_resource.clear()
+            st.rerun()
+
+    st.divider()
+
+    # Добавить здание
+    st.subheader("➕ Add Building")
+    selected_client_for_add = st.selectbox("Select client:", clients, key="add_building_client")
+    new_building = st.text_input("Building name:", key="new_building")
+    if st.button("Add Building"):
+        if new_building.strip() == "":
+            st.error("Enter a building name!")
+        else:
+            add_building(sheet, selected_client_for_add, new_building.strip())
+            st.success(f"✅ Building '{new_building}' added!")
+            st.cache_resource.clear()
+            st.rerun()
+
+    st.divider()
+
+    # Удалить здание
+    st.subheader("🗑️ Delete Building")
+    selected_client_for_del = st.selectbox("Select client:", clients, key="del_building_client")
+    client_buildings = df[df["Client:"] == selected_client_for_del]["Building:"].tolist()
+    if client_buildings:
+        building_to_delete = st.selectbox("Select building:", client_buildings, key="del_building")
+        if st.button("Delete Building", type="primary"):
+            delete_building(sheet, df, selected_client_for_del, building_to_delete)
+            st.success(f"✅ Building '{building_to_delete}' deleted!")
+            st.cache_resource.clear()
+            st.rerun()
+    else:
+        st.info("No buildings for this client.")
+
+    st.divider()
+
+    # Удалить клиента
+    st.subheader("🗑️ Delete Client")
+    client_to_delete = st.selectbox("Select client to delete:", clients, key="del_client")
+    st.warning(f"⚠️ This will delete ALL buildings of '{client_to_delete}'!")
+    if st.button("Delete Client", type="primary"):
+        delete_client(sheet, df, client_to_delete)
+        st.success(f"✅ Client '{client_to_delete}' deleted!")
+        st.cache_resource.clear()
+        st.rerun()
+
+# --- Основной экран ---
+st.subheader("📋 View Buildings")
+selected_client = st.selectbox("Select client:", clients)
 client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
 
 st.markdown(f"### Buildings for: **{selected_client}**")
@@ -97,7 +176,6 @@ st.markdown(f"Total: **{len(client_df)}** buildings")
 
 st.divider()
 
-# Таблица зданий
 for i, row in client_df.iterrows():
     current_status = row["JSON Status:"] if row["JSON Status:"] in STATUS_OPTIONS else "Unknown status"
     bg_color = STATUS_COLORS.get(current_status, "#3a3a3a")
@@ -131,4 +209,5 @@ for i, row in client_df.iterrows():
             ].index[0]
             update_status(sheet, original_index, new_status)
             st.success("✅ Saved!")
+            st.cache_resource.clear()
             st.rerun()
