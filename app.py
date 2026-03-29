@@ -294,8 +294,6 @@ if st.button(
             st.session_state["editing_building"] = None
             st.rerun()
 
-    st.divider()
-
     with st.expander("➕ Add new client"):
         new_client_name = st.text_input("Client name:")
         first_building = st.text_input("First facility:")
