@@ -118,12 +118,14 @@ def export_excel(df):
 # --- Стили ---
 st.markdown("""
     <style>
-    .building-card {
-        padding: 12px 16px;
+    .client-row {
+        padding: 14px 18px;
         border-radius: 10px;
         margin-bottom: 8px;
+        background-color: #1e1e2e;
+        border: 1px solid #333;
     }
-    .building-name {
+    .client-name {
         font-size: 16px;
         font-weight: 600;
         color: white;
@@ -133,6 +135,16 @@ st.markdown("""
         border-radius: 20px;
         font-size: 13px;
         font-weight: 600;
+    }
+    .building-card {
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
+    .building-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -231,24 +243,34 @@ if st.session_state["selected_client"] is None:
         progress = done_count / total if total > 0 else 0
 
         if status_label == "Done":
-            icon = "🟢"
+            badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
         elif status_label == "Not started":
-            icon = "🔴"
+            badge_bg = "#7a1a1a"; badge_color = "#ff4444"; icon = "🔴"
         else:
-            icon = "🟡"
+            badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
-        progress_bar = "▓" * int(progress * 20) + "░" * (20 - int(progress * 20))
-
-        if st.button(
-            f"🏢  {client}   |   {icon} {status_label}  ·  {done_count}/{total}  {progress_bar}",
-            key=f"open_{client}",
-            use_container_width=True
-        ):
-            st.session_state["selected_client"] = client
-            st.session_state["confirm_delete"] = False
-            st.session_state["editing_client"] = False
-            st.session_state["editing_building"] = None
-            st.rerun()
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            st.markdown(f"""
+                <div class="client-row">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <span class="client-name">🏢 {client}</span>
+                        <span class="badge" style="background-color:{badge_bg}; color:{badge_color};">
+                            {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
+                        </span>
+                    </div>
+                    <div style="margin-top:8px; background:#333; border-radius:10px; height:5px;">
+                        <div style="width:{int(progress*100)}%; background:{badge_color}; border-radius:10px; height:5px;"></div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            if st.button("Open →", key=f"open_{client}"):
+                st.session_state["selected_client"] = client
+                st.session_state["confirm_delete"] = False
+                st.session_state["editing_client"] = False
+                st.session_state["editing_building"] = None
+                st.rerun()
 
     st.divider()
 
