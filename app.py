@@ -13,22 +13,25 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 STATUS_COLORS = {
     "Done": "#1a7a1a",
     "Undone": "#7a1a1a",
+    "In progress": "#1a3a7a",
     "Outdoors only": "#7a6a1a",
     "Unknown status": "#3a3a3a"
 }
 STATUS_TEXT_COLORS = {
     "Done": "#00ff00",
     "Undone": "#ff4444",
+    "In progress": "#4488ff",
     "Outdoors only": "#ffcc00",
     "Unknown status": "#aaaaaa"
 }
 STATUS_ICONS = {
     "Done": "🟢",
     "Undone": "🔴",
+    "In progress": "🔵",
     "Outdoors only": "🟡",
     "Unknown status": "⚪"
 }
-STATUS_OPTIONS = ["Done", "Undone", "Outdoors only", "Unknown status"]
+STATUS_OPTIONS = ["Done", "Undone", "In progress", "Outdoors only", "Unknown status"]
 
 # --- Google Sheets ---
 @st.cache_resource
@@ -48,9 +51,13 @@ def update_status(sheet, row_index, new_status):
     time.sleep(0.5)
     sheet.update_cell(row_index + 2, 3, new_status)
 
+def update_done_by(sheet, row_index, done_by):
+    time.sleep(0.5)
+    sheet.update_cell(row_index + 2, 4, done_by)
+
 def add_row(sheet, client_name, building_name):
     time.sleep(0.5)
-    sheet.append_row([client_name, building_name, "Unknown status"])
+    sheet.append_row([client_name, building_name, "Unknown status", ""])
 
 def delete_building(sheet, client_name, building_name):
     time.sleep(0.5)
@@ -101,9 +108,7 @@ def get_client_status(client_buildings_df):
 def export_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        # Общий лист
         df.to_excel(writer, index=False, sheet_name="All Data")
-        # Лист по каждому клиенту
         for client in df["Client:"].unique():
             client_df = df[df["Client:"] == client]
             safe_name = client[:31]
@@ -129,8 +134,9 @@ st.markdown("""
         font-size: 13px;
         font-weight: 600;
     }
-    div[data-testid="stButton"] button {
-        transition: background 0.2s;
+    @media (max-width: 768px) {
+        .building-name { font-size: 14px; }
+        .badge { font-size: 11px; padding: 3px 10px; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -148,6 +154,11 @@ if "editing_building" not in st.session_state:
     st.session_state["editing_building"] = None
 
 df, sheet = load_data()
+
+# Добавляем колонку Done by: если её нет
+if "Done by:" not in df.columns:
+    df["Done by:"] = ""
+
 clients = sorted(df["Client:"].unique().tolist())
 
 # =====================
@@ -155,16 +166,16 @@ clients = sorted(df["Client:"].unique().tolist())
 # =====================
 if st.session_state["selected_client"] is None:
 
-    st.title("🏢 Buildings JSON Tracker")
+    st.title("🏢 Buildings Tracker")
 
-    # --- Счётчик вверху ---
-    total_clients = len(clients)
-    done_clients = sum(1 for c in clients if get_client_status(df[df["Client:"] == c])[0] == "Done")
-    progress_clients = sum(1 for c in clients if get_client_status(df[df["Client:"] == c])[0] == "In progress")
-    not_started_clients = sum(1 for c in clients if get_client_status(df[df["Client:"] == c])[0] == "Not started")
+    # --- Счётчик ---
+    client_statuses = [get_client_status(df[df["Client:"] == c]) for c in clients]
+    done_clients = sum(1 for s in client_statuses if s[0] == "Done")
+    progress_clients = sum(1 for s in client_statuses if s[0] == "In progress")
+    not_started_clients = sum(1 for s in client_statuses if s[0] == "Not started")
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total clients", total_clients)
+    c1.metric("Total clients", len(clients))
     c2.metric("🟢 Done", done_clients)
     c3.metric("🟡 In progress", progress_clients)
     c4.metric("🔴 Not started", not_started_clients)
@@ -173,21 +184,12 @@ if st.session_state["selected_client"] is None:
 
     # --- Поиск + Фильтр + Сортировка ---
     col_search, col_filter, col_sort = st.columns([3, 2, 2])
-
     with col_search:
         search = st.text_input("🔍 Search client:", placeholder="Type client name...")
-
     with col_filter:
-        status_filter = st.selectbox(
-            "Filter by status:",
-            ["All", "Done", "In progress", "Not started"]
-        )
-
+        status_filter = st.selectbox("Filter by status:", ["All", "Done", "In progress", "Not started"])
     with col_sort:
-        sort_by = st.selectbox(
-            "Sort by:",
-            ["Name (A-Z)", "Name (Z-A)", "Status (Done first)", "Status (Not started first)"]
-        )
+        sort_by = st.selectbox("Sort by:", ["Name (A-Z)", "Name (Z-A)", "Status (Done first)", "Status (Not started first)"])
 
     # --- Экспорт ---
     excel_data = export_excel(df)
@@ -200,11 +202,9 @@ if st.session_state["selected_client"] is None:
 
     st.divider()
 
-    # --- Применяем фильтры ---
+    # --- Фильтрация и сортировка ---
     client_data = []
-    for client in clients:
-        client_df = df[df["Client:"] == client]
-        status_label, done_count, total = get_client_status(client_df)
+    for client, (status_label, done_count, total) in zip(clients, client_statuses):
         client_data.append({
             "name": client,
             "status": status_label,
@@ -212,25 +212,19 @@ if st.session_state["selected_client"] is None:
             "total": total
         })
 
-    # Поиск
     if search:
         client_data = [c for c in client_data if search.lower() in c["name"].lower()]
-
-    # Фильтр
     if status_filter != "All":
         client_data = [c for c in client_data if c["status"] == status_filter]
 
-    # Сортировка
-    if sort_by == "Name (A-Z)":
-        client_data = sorted(client_data, key=lambda x: x["name"])
-    elif sort_by == "Name (Z-A)":
-        client_data = sorted(client_data, key=lambda x: x["name"], reverse=True)
-    elif sort_by == "Status (Done first)":
-        order = {"Done": 0, "In progress": 1, "Not started": 2}
-        client_data = sorted(client_data, key=lambda x: order[x["status"]])
-    elif sort_by == "Status (Not started first)":
-        order = {"Not started": 0, "In progress": 1, "Done": 2}
-        client_data = sorted(client_data, key=lambda x: order[x["status"]])
+    order_map = {
+        "Name (A-Z)": lambda x: x["name"],
+        "Name (Z-A)": lambda x: x["name"],
+        "Status (Done first)": lambda x: {"Done": 0, "In progress": 1, "Not started": 2}[x["status"]],
+        "Status (Not started first)": lambda x: {"Not started": 0, "In progress": 1, "Done": 2}[x["status"]]
+    }
+    reverse = sort_by == "Name (Z-A)"
+    client_data = sorted(client_data, key=order_map[sort_by], reverse=reverse)
 
     st.markdown(f"Showing **{len(client_data)}** clients")
 
@@ -250,9 +244,9 @@ if st.session_state["selected_client"] is None:
             badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
         st.markdown(f"""
-            <div style="position:relative; padding:14px 18px; border-radius:10px;
-            margin-bottom:4px; background-color:#1e1e2e; border:1px solid #333;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="padding:14px 18px; border-radius:10px; margin-bottom:4px;
+            background-color:#1e1e2e; border:1px solid #333;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                     <span style="font-size:16px; font-weight:600; color:white;">
                         🏢 {client}
                     </span>
@@ -268,7 +262,11 @@ if st.session_state["selected_client"] is None:
             </div>
         """, unsafe_allow_html=True)
 
-        if st.button("", key=f"open_{client}", help=f"Open {client}", use_container_width=True):
+        if st.button(
+            f"Open {client}",
+            key=f"open_{client}",
+            use_container_width=True
+        ):
             st.session_state["selected_client"] = client
             st.session_state["confirm_delete"] = False
             st.session_state["editing_client"] = False
@@ -277,15 +275,16 @@ if st.session_state["selected_client"] is None:
 
         st.markdown("""
             <style>
-            div[data-testid="stButton"] button {
-                margin-top: -62px;
-                height: 56px;
+            div[data-testid="stButton"] > button {
+                margin-top: -54px;
+                height: 54px;
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
+                color: transparent !important;
             }
-            div[data-testid="stButton"] button:hover {
-                background: rgba(255,255,255,0.05) !important;
+            div[data-testid="stButton"] > button:hover {
+                background: rgba(255,255,255,0.04) !important;
                 border-radius: 10px !important;
             }
             </style>
@@ -322,7 +321,7 @@ else:
         st.session_state["editing_building"] = None
         st.rerun()
 
-    # --- Заголовок + редактирование имени клиента ---
+    # --- Заголовок ---
     status_label, done_count, total = get_client_status(client_df)
     if status_label == "Done":
         badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
@@ -332,7 +331,6 @@ else:
         badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
 
     col_title, col_edit, col_delete = st.columns([4, 1, 1])
-
     with col_title:
         st.markdown(f"## 🏢 {selected_client}")
         st.markdown(f"""
@@ -350,12 +348,12 @@ else:
 
     with col_edit:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("✏️ Rename client"):
+        if st.button("✏️ Rename"):
             st.session_state["editing_client"] = True
 
     with col_delete:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗑️ Delete client", type="primary"):
+        if st.button("🗑️ Delete", type="primary"):
             st.session_state["confirm_delete"] = True
 
     # --- Переименование клиента ---
@@ -396,7 +394,7 @@ else:
     # --- Экспорт клиента ---
     client_export = export_excel(df[df["Client:"] == selected_client])
     st.download_button(
-        label="📥 Export this client to Excel",
+        label="📥 Export to Excel",
         data=client_export,
         file_name=f"{selected_client}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -411,8 +409,9 @@ else:
         bg_color = STATUS_COLORS.get(current_status, "#3a3a3a")
         text_color = STATUS_TEXT_COLORS.get(current_status, "#aaaaaa")
         icon = STATUS_ICONS.get(current_status, "⚪")
+        current_done_by = str(row.get("Done by:", "")).strip() if "Done by:" in row else ""
 
-        col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
 
         with col1:
             st.markdown(f"""
@@ -422,6 +421,7 @@ else:
                     <span class="badge" style="color: {text_color};">
                         {icon} {current_status}
                     </span>
+                    {f'<br><span style="font-size:12px; color:#ddd; margin-top:4px; display:block;">👤 {current_done_by}</span>' if current_done_by else ''}
                 </div>
             """, unsafe_allow_html=True)
 
@@ -443,11 +443,28 @@ else:
                 st.rerun()
 
         with col3:
+            new_done_by = st.text_input(
+                "Done by:",
+                value=current_done_by,
+                placeholder="Enter name...",
+                key=f"done_by_{selected_client}_{i}"
+            )
+            if st.button("💾 Save", key=f"save_done_by_{selected_client}_{i}"):
+                original_index = df[
+                    (df["Client:"] == selected_client) &
+                    (df["Building:"] == row["Building:"])
+                ].index[0]
+                update_done_by(sheet, original_index, new_done_by.strip())
+                st.success("✅ Saved!")
+                st.cache_resource.clear()
+                st.rerun()
+
+        with col4:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("✏️", key=f"edit_{selected_client}_{i}", help="Rename facility"):
                 st.session_state["editing_building"] = i
 
-        with col4:
+        with col5:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🗑️", key=f"del_{selected_client}_{i}", help="Delete facility"):
                 delete_building(sheet, selected_client, row["Building:"])
