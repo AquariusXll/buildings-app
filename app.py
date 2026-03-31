@@ -134,10 +134,6 @@ st.markdown("""
         font-size: 13px;
         font-weight: 600;
     }
-    @media (max-width: 768px) {
-        .building-name { font-size: 14px; }
-        .badge { font-size: 11px; padding: 3px 10px; }
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -155,7 +151,6 @@ if "editing_building" not in st.session_state:
 
 df, sheet = load_data()
 
-# Добавляем колонку Done by: если её нет
 if "Done by:" not in df.columns:
     df["Done by:"] = ""
 
@@ -191,7 +186,6 @@ if st.session_state["selected_client"] is None:
     with col_sort:
         sort_by = st.selectbox("Sort by:", ["Name (A-Z)", "Name (Z-A)", "Status (Done first)", "Status (Not started first)"])
 
-    # --- Экспорт ---
     excel_data = export_excel(df)
     st.download_button(
         label="📥 Export to Excel",
@@ -237,33 +231,16 @@ if st.session_state["selected_client"] is None:
         progress = done_count / total if total > 0 else 0
 
         if status_label == "Done":
-            badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
+            icon = "🟢"
         elif status_label == "Not started":
-            badge_bg = "#7a1a1a"; badge_color = "#ff4444"; icon = "🔴"
+            icon = "🔴"
         else:
-            badge_bg = "#7a6a1a"; badge_color = "#ffcc00"; icon = "🟡"
+            icon = "🟡"
 
-        st.markdown(f"""
-            <div style="padding:14px 18px; border-radius:10px; margin-bottom:4px;
-            background-color:#1e1e2e; border:1px solid #333;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <span style="font-size:16px; font-weight:600; color:white;">
-                        🏢 {client}
-                    </span>
-                    <span style="padding:4px 14px; border-radius:20px; font-size:13px;
-                    font-weight:600; background-color:{badge_bg}; color:{badge_color};">
-                        {icon} {status_label} &nbsp;|&nbsp; {done_count}/{total} facilities
-                    </span>
-                </div>
-                <div style="margin-top:8px; background:#333; border-radius:10px; height:6px;">
-                    <div style="width:{int(progress*100)}%; background:{badge_color};
-                    border-radius:10px; height:6px;"></div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        progress_bar = "▓" * int(progress * 20) + "░" * (20 - int(progress * 20))
 
         if st.button(
-            f"Open {client}",
+            f"🏢  {client}   |   {icon} {status_label}  ·  {done_count}/{total}  {progress_bar}",
             key=f"open_{client}",
             use_container_width=True
         ):
@@ -272,23 +249,6 @@ if st.session_state["selected_client"] is None:
             st.session_state["editing_client"] = False
             st.session_state["editing_building"] = None
             st.rerun()
-
-        st.markdown("""
-            <style>
-            div[data-testid="stButton"] > button {
-                margin-top: -54px;
-                height: 54px;
-                background: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
-                color: transparent !important;
-            }
-            div[data-testid="stButton"] > button:hover {
-                background: rgba(255,255,255,0.04) !important;
-                border-radius: 10px !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
 
     st.divider()
 
@@ -313,7 +273,6 @@ else:
     selected_client = st.session_state["selected_client"]
     client_df = df[df["Client:"] == selected_client].reset_index(drop=True)
 
-    # --- Назад ---
     if st.button("← Back to all clients"):
         st.session_state["selected_client"] = None
         st.session_state["confirm_delete"] = False
@@ -321,7 +280,6 @@ else:
         st.session_state["editing_building"] = None
         st.rerun()
 
-    # --- Заголовок ---
     status_label, done_count, total = get_client_status(client_df)
     if status_label == "Done":
         badge_bg = "#1a7a1a"; badge_color = "#00ff00"; icon = "🟢"
@@ -356,7 +314,6 @@ else:
         if st.button("🗑️ Delete", type="primary"):
             st.session_state["confirm_delete"] = True
 
-    # --- Переименование клиента ---
     if st.session_state.get("editing_client"):
         new_name = st.text_input("New client name:", value=selected_client)
         c1, c2 = st.columns(2)
@@ -373,7 +330,6 @@ else:
                 st.session_state["editing_client"] = False
                 st.rerun()
 
-    # --- Удалить клиента ---
     if st.session_state["confirm_delete"]:
         st.warning(f"⚠️ Delete **{selected_client}** and ALL their facilities?")
         c1, c2 = st.columns(2)
@@ -391,7 +347,6 @@ else:
 
     st.divider()
 
-    # --- Экспорт клиента ---
     client_export = export_excel(df[df["Client:"] == selected_client])
     st.download_button(
         label="📥 Export to Excel",
@@ -472,7 +427,6 @@ else:
                 st.cache_resource.clear()
                 st.rerun()
 
-        # --- Переименование здания ---
         if st.session_state.get("editing_building") == i:
             new_building_name = st.text_input(
                 "New facility name:",
