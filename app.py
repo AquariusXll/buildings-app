@@ -49,12 +49,12 @@ def load_data():
 
 def update_status(row_index, new_status):
     sheet = get_sheet()
-    time.sleep(0.5)
+    time.sleep(1)
     sheet.update_cell(row_index + 2, 3, new_status)
 
 def update_done_by(row_index, done_by):
     sheet = get_sheet()
-    time.sleep(0.5)
+    time.sleep(1)
     sheet.update_cell(row_index + 2, 4, done_by)
 
 def add_row(client_name, building_name):
@@ -293,6 +293,7 @@ if st.session_state["selected_client"] is None:
                 add_row(new_client_name.strip(), first_building.strip())
                 st.success(f"✅ Client '{new_client_name}' created!")
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
 
 # =====================
@@ -353,6 +354,7 @@ else:
                     st.session_state["selected_client"] = new_name.strip()
                     st.session_state["editing_client"] = False
                     get_sheet.clear()
+                    time.sleep(1)
                     st.rerun()
         with c2:
             if st.button("Cancel rename"):
@@ -368,6 +370,7 @@ else:
                 st.session_state["selected_client"] = None
                 st.session_state["confirm_delete"] = False
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
         with c2:
             if st.button("Cancel"):
@@ -424,6 +427,7 @@ else:
                 update_status(original_index, new_status)
                 st.success("✅ Saved!")
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
 
         with col3:
@@ -441,6 +445,7 @@ else:
                 update_done_by(original_index, new_done_by.strip())
                 st.success("✅ Saved!")
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
 
         with col4:
@@ -454,6 +459,7 @@ else:
                 delete_building(selected_client, row["Building:"])
                 st.success("✅ Deleted!")
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
 
         if st.session_state.get("editing_building") == i:
@@ -469,6 +475,7 @@ else:
                         rename_building(selected_client, row["Building:"], new_building_name.strip())
                         st.session_state["editing_building"] = None
                         get_sheet.clear()
+                        time.sleep(1)
                         st.rerun()
             with r2:
                 if st.button("Cancel", key=f"cancel_rename_{i}"):
@@ -486,4 +493,5 @@ else:
                 add_row(selected_client, new_building.strip())
                 st.success(f"✅ '{new_building}' added!")
                 get_sheet.clear()
+                time.sleep(1)
                 st.rerun()
