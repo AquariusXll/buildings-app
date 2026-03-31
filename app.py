@@ -35,31 +35,35 @@ STATUS_OPTIONS = ["Done", "Undone", "In progress", "Outdoors only", "Unknown sta
 
 # --- Google Sheets ---
 @st.cache_resource
-def get_client():
+def get_sheet():
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"], scopes=SCOPES
     )
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
 
 def load_data():
-    client = get_client()
-    sheet = client.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
+    sheet = get_sheet()
     data = sheet.get_all_records()
-    return pd.DataFrame(data), sheet
+    return pd.DataFrame(data)
 
-def update_status(sheet, row_index, new_status):
+def update_status(row_index, new_status):
+    sheet = get_sheet()
     time.sleep(0.5)
     sheet.update_cell(row_index + 2, 3, new_status)
 
-def update_done_by(sheet, row_index, done_by):
+def update_done_by(row_index, done_by):
+    sheet = get_sheet()
     time.sleep(0.5)
     sheet.update_cell(row_index + 2, 4, done_by)
 
-def add_row(sheet, client_name, building_name):
+def add_row(client_name, building_name):
+    sheet = get_sheet()
     time.sleep(0.5)
     sheet.append_row([client_name, building_name, "Unknown status", ""])
 
-def delete_building(sheet, client_name, building_name):
+def delete_building(client_name, building_name):
+    sheet = get_sheet()
     time.sleep(0.5)
     all_values = sheet.get_all_values()
     for i, row in enumerate(all_values[1:], start=2):
@@ -67,7 +71,8 @@ def delete_building(sheet, client_name, building_name):
             sheet.delete_rows(i)
             break
 
-def delete_client(sheet, client_name):
+def delete_client(client_name):
+    sheet = get_sheet()
     time.sleep(0.5)
     all_values = sheet.get_all_values()
     rows_to_delete = []
@@ -78,7 +83,8 @@ def delete_client(sheet, client_name):
         sheet.delete_rows(row_num)
         time.sleep(0.3)
 
-def rename_client(sheet, old_name, new_name):
+def rename_client(old_name, new_name):
+    sheet = get_sheet()
     time.sleep(0.5)
     all_values = sheet.get_all_values()
     for i, row in enumerate(all_values[1:], start=2):
@@ -86,7 +92,8 @@ def rename_client(sheet, old_name, new_name):
             sheet.update_cell(i, 1, new_name)
             time.sleep(0.2)
 
-def rename_building(sheet, client_name, old_name, new_name):
+def rename_building(client_name, old_name, new_name):
+    sheet = get_sheet()
     time.sleep(0.5)
     all_values = sheet.get_all_values()
     for i, row in enumerate(all_values[1:], start=2):
@@ -161,7 +168,7 @@ if "editing_client" not in st.session_state:
 if "editing_building" not in st.session_state:
     st.session_state["editing_building"] = None
 
-df, sheet = load_data()
+df = load_data()
 
 if "Done by:" not in df.columns:
     df["Done by:"] = ""
@@ -283,9 +290,9 @@ if st.session_state["selected_client"] is None:
             elif new_client_name.strip() in clients:
                 st.error("Client already exists!")
             else:
-                add_row(sheet, new_client_name.strip(), first_building.strip())
+                add_row(new_client_name.strip(), first_building.strip())
                 st.success(f"✅ Client '{new_client_name}' created!")
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
 
 # =====================
@@ -342,10 +349,10 @@ else:
         with c1:
             if st.button("Save name", type="primary"):
                 if new_name.strip() and new_name.strip() != selected_client:
-                    rename_client(sheet, selected_client, new_name.strip())
+                    rename_client(selected_client, new_name.strip())
                     st.session_state["selected_client"] = new_name.strip()
                     st.session_state["editing_client"] = False
-                    st.cache_resource.clear()
+                    get_sheet.clear()
                     st.rerun()
         with c2:
             if st.button("Cancel rename"):
@@ -357,10 +364,10 @@ else:
         c1, c2 = st.columns(2)
         with c1:
             if st.button("Yes, delete"):
-                delete_client(sheet, selected_client)
+                delete_client(selected_client)
                 st.session_state["selected_client"] = None
                 st.session_state["confirm_delete"] = False
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
         with c2:
             if st.button("Cancel"):
@@ -414,9 +421,9 @@ else:
                     (df["Client:"] == selected_client) &
                     (df["Building:"] == row["Building:"])
                 ].index[0]
-                update_status(sheet, original_index, new_status)
+                update_status(original_index, new_status)
                 st.success("✅ Saved!")
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
 
         with col3:
@@ -431,9 +438,9 @@ else:
                     (df["Client:"] == selected_client) &
                     (df["Building:"] == row["Building:"])
                 ].index[0]
-                update_done_by(sheet, original_index, new_done_by.strip())
+                update_done_by(original_index, new_done_by.strip())
                 st.success("✅ Saved!")
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
 
         with col4:
@@ -444,9 +451,9 @@ else:
         with col5:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🗑️", key=f"del_{selected_client}_{i}", help="Delete facility"):
-                delete_building(sheet, selected_client, row["Building:"])
+                delete_building(selected_client, row["Building:"])
                 st.success("✅ Deleted!")
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
 
         if st.session_state.get("editing_building") == i:
@@ -459,9 +466,9 @@ else:
             with r1:
                 if st.button("Save", type="primary", key=f"save_rename_{i}"):
                     if new_building_name.strip() and new_building_name.strip() != row["Building:"]:
-                        rename_building(sheet, selected_client, row["Building:"], new_building_name.strip())
+                        rename_building(selected_client, row["Building:"], new_building_name.strip())
                         st.session_state["editing_building"] = None
-                        st.cache_resource.clear()
+                        get_sheet.clear()
                         st.rerun()
             with r2:
                 if st.button("Cancel", key=f"cancel_rename_{i}"):
@@ -476,7 +483,7 @@ else:
             if new_building.strip() == "":
                 st.error("Enter a facility name!")
             else:
-                add_row(sheet, selected_client, new_building.strip())
+                add_row(selected_client, new_building.strip())
                 st.success(f"✅ '{new_building}' added!")
-                st.cache_resource.clear()
+                get_sheet.clear()
                 st.rerun()
